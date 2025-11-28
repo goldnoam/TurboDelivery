@@ -1,14 +1,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { LevelTheme } from "../types";
 
-// Initialize the API client
-// Note: In a real production app, you might proxy this through a backend to protect the key.
-// Here we assume a client-side environment where the key is injected via env.
-const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) ? process.env.API_KEY : '';
-const ai = new GoogleGenAI({ apiKey });
+// Helper to safely get API key
+const getApiKey = () => (typeof process !== 'undefined' && process.env && process.env.API_KEY) ? process.env.API_KEY : '';
 
 export const generateLevelMission = async (levelNumber: number, vehicleName: string): Promise<LevelTheme> => {
-  // Fallback if no key is present or error occurs
   const fallback: LevelTheme = {
     title: `Level ${levelNumber}`,
     description: "Deliver as many packages as possible! Avoid the stray animals.",
@@ -16,12 +12,17 @@ export const generateLevelMission = async (levelNumber: number, vehicleName: str
     primaryObstacle: "Stray Dogs"
   };
 
+  const apiKey = getApiKey();
+
   if (!apiKey) {
     console.warn("No API_KEY found. Using fallback level data.");
     return fallback;
   }
 
   try {
+    // Initialize the API client inside the function to avoid top-level crashes
+    const ai = new GoogleGenAI({ apiKey });
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Generate a funny, high-stakes, 1-sentence delivery mission briefing for level ${levelNumber} of a game. 

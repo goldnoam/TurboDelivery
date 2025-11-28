@@ -11,8 +11,12 @@
       // Shim process.env for browser compatibility to prevent ReferenceErrors
       window.process = window.process || { env: { API_KEY: '' } };
 
-      // Initialize ads array immediately
-      window.adsbygoogle = window.adsbygoogle || [];
+      // Initialize ads array immediately with safety wrapper
+      try {
+        window.adsbygoogle = window.adsbygoogle || [];
+      } catch (e) {
+        window.adsbygoogle = [];
+      }
 
       // Tailwind Config must be defined before tailwind script loads or immediately handled
       window.tailwind = {
@@ -46,12 +50,17 @@
         const originalError = console.error;
         
         const isIgnorableMessage = (args) => {
-          const msg = args[0];
-          if (typeof msg !== 'string') return false;
-          return msg.includes('cdn.tailwindcss.com') || 
-                 msg.includes('should not be used in production') ||
-                 msg.includes('adsbygoogle') || 
-                 msg.includes('TagError'); 
+          try {
+            const msg = args[0];
+            if (typeof msg !== 'string') return false;
+            return msg.includes('cdn.tailwindcss.com') || 
+                   msg.includes('should not be used in production') ||
+                   msg.includes('adsbygoogle') || 
+                   msg.includes('TagError') ||
+                   msg.includes('ERR_BLOCKED_BY_CLIENT'); 
+          } catch (e) {
+            return false;
+          }
         };
 
         console.warn = function(...args) {
@@ -69,12 +78,14 @@
            originalError.apply(console, args);
         }
       })();
+
+      function handleAdSenseError(e) {
+        // Silently handle ad blocking
+        console.log("AdSense blocked or failed to load. Continuing app execution.");
+        return true;
+      }
     </script>
 
-    <!-- AdSense Script -->
-    <!-- Note: ERR_BLOCKED_BY_CLIENT is expected if an ad blocker is enabled. -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-0274741291001288" crossorigin="anonymous"></script>
-    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -114,5 +125,12 @@
 </head>
   <body class="bg-black text-white overflow-hidden">
     <div id="root"></div>
+    
+    <!-- AdSense Script placed at end of body with explicit error handling -->
+    <script async 
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-0274741291001288" 
+      crossorigin="anonymous"
+      onerror="handleAdSenseError(this)">
+    </script>
   </body>
 </html>
