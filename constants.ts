@@ -50,7 +50,7 @@ export const VEHICLES: Record<VehicleType, VehicleStats> = {
     speed: 1.6,
     handling: 1.4,
     incomeMultiplier: 4.0,
-    icon: "🚜", // Using tractor emoji as closest for ATV/Quad if generic not avail, or 4-wheeler
+    icon: "🚙",
     description: "Off-road beast. Handles bumps like a champ."
   },
   [VehicleType.MOTORCYCLE]: {

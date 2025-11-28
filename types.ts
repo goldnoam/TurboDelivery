@@ -1,3 +1,4 @@
+
 export enum VehicleType {
   SCOOTER = 'SCOOTER',
   BICYCLE = 'BICYCLE',
@@ -25,8 +26,13 @@ export enum EntityType {
   OBSTACLE_CAT = 'OBSTACLE_CAT',
   OBSTACLE_PERSON = 'OBSTACLE_PERSON',
   OBSTACLE_KID = 'OBSTACLE_KID',
+  OBSTACLE_CONE = 'OBSTACLE_CONE',
+  OBSTACLE_BARRIER = 'OBSTACLE_BARRIER',
+  OBSTACLE_CAR = 'OBSTACLE_CAR',
   PACKAGE = 'PACKAGE',
-  COIN = 'COIN'
+  COIN = 'COIN',
+  POWERUP_SHIELD = 'POWERUP_SHIELD',
+  POWERUP_MAGNET = 'POWERUP_MAGNET'
 }
 
 export interface Entity {
@@ -37,6 +43,7 @@ export interface Entity {
   width: number; // Percentage
   height: number; // Percentage
   speedOffset: number; // Some obstacles might move faster/slower
+  vx?: number; // Horizontal velocity for moving obstacles
 }
 
 export interface GameState {
