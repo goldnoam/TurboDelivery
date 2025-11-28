@@ -7,17 +7,55 @@
     <meta name="description" content="A high-octane delivery runner game. Start on a scooter and upgrade to a race car.">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚚%3C/text%3E%3C/svg%3E">
     <script>
-      // Suppress Tailwind CDN warning for cleaner console in this runtime environment
+      // Suppress Tailwind CDN warnings to simulate a production environment and keep console clean
       (function() {
         const originalWarn = console.warn;
+        const originalLog = console.log;
+        
+        const isTailwindMessage = (args) => {
+          return args.some(arg => 
+            typeof arg === 'string' && 
+            (arg.includes('cdn.tailwindcss.com') || arg.includes('should not be used in production'))
+          );
+        };
+
         console.warn = function(...args) {
-          if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) return;
+          if (isTailwindMessage(args)) return;
           originalWarn.apply(console, args);
+        };
+        
+        console.log = function(...args) {
+          if (isTailwindMessage(args)) return;
+          originalLog.apply(console, args);
         };
       })();
     </script>
+    <!-- AdSense Script: May be blocked by ad-blockers (ERR_BLOCKED_BY_CLIENT) which is expected behavior -->
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-0274741291001288" crossorigin="anonymous"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            animation: {
+              'road-scroll': 'road-scroll 0.5s linear infinite',
+            },
+            backgroundImage: {
+              'dashed-line': "linear-gradient(to bottom, transparent 50%, rgba(255, 255, 255, 0.5) 50%)",
+            },
+            backgroundSize: {
+              'dashed-line': '20px 80px'
+            },
+            keyframes: {
+              'road-scroll': {
+                '0%': { backgroundPosition: '0 0' },
+                '100%': { backgroundPosition: '0 80px' },
+              }
+            }
+          }
+        }
+      }
+    </script>
     <style>
       /* Custom scrollbar for webkit */
       ::-webkit-scrollbar {

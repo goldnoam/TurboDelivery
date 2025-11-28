@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { VehicleStats, Entity, EntityType, LevelTheme } from '../types';
 import { LEVEL_DURATION } from '../constants';
-import { Trophy, Package, ChevronLeft, ChevronRight, Gauge, Zap, Map as MapIcon, Shield, Magnet } from 'lucide-react';
+import { Trophy, Package, ChevronLeft, ChevronRight, Gauge, Zap, Map as MapIcon, Shield, Magnet, Pause, RotateCcw, LogOut, Play, FastForward } from 'lucide-react';
 import { 
   playCollectSound, 
   playGenericCrash, 
@@ -51,6 +51,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
   const [shake, setShake] = useState(0);
   const [boostLevel, setBoostLevel] = useState(100);
   const [screenCrack, setScreenCrack] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   
   // Power-up States
   const shieldActive = useRef(false);
@@ -82,6 +83,13 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
   // Input Handling
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => { 
+        if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
+            togglePause();
+            return;
+        }
+
+        if (isPaused) return;
+
         keysPressed.current[e.key] = true; 
         if (e.code === 'Space') isBoostingRef.current = true;
     };
@@ -97,7 +105,42 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [isPaused]);
+
+  const togglePause = () => {
+      setIsPaused(prev => !prev);
+  };
+
+  const handleRestart = () => {
+      setIsPaused(false);
+      setTimeLeft(LEVEL_DURATION);
+      setEarnedMoney(0);
+      setBoostLevel(100);
+      setScreenCrack(false);
+      setShake(0);
+      setFeedback([]);
+      
+      // Reset Refs
+      earnedMoneyRef.current = 0;
+      entities.current = [];
+      particles.current = [];
+      playerPos.current = 50;
+      lastTime.current = 0;
+      boostLevelRef.current = 100;
+      shieldActive.current = false;
+      magnetTimer.current = 0;
+      keysPressed.current = {};
+      isBoostingRef.current = false;
+      gameActive.current = true;
+  };
+
+  const handleQuit = () => {
+      onGameOver(earnedMoneyRef.current, false);
+  };
+
+  const handleSkip = () => {
+      onGameOver(earnedMoneyRef.current, true);
+  };
 
   const spawnEntity = useCallback(() => {
     const r = Math.random();
@@ -274,7 +317,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
   };
 
   const update = useCallback((time: number) => {
-    if (!gameActive.current) return;
+    if (!gameActive.current || isPaused) return;
     
     if (lastTime.current === 0) {
       lastTime.current = time;
@@ -463,21 +506,23 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
        playerRef.current.style.transform = `translateX(-50%) rotate(${tilt}deg)`;
     }
     
-    // We update this state to trigger re-renders, but we don't depend on it in the logic
-    // so we don't list it in useCallback dependencies
     setTick(t => t + 1);
 
     if (gameActive.current) {
         animationFrameId.current = requestAnimationFrame(update);
     }
-  }, [vehicle, spawnEntity, speedMultiplier, onGameOver, shake, baseSpawnRate]); // Removed boostLevel to prevent recursion
+  }, [vehicle, spawnEntity, speedMultiplier, onGameOver, shake, baseSpawnRate, isPaused]);
 
   const [_, setTick] = useState(0);
 
+  // Restart loop when unpausing
   useEffect(() => {
-    animationFrameId.current = requestAnimationFrame(update);
+    if (!isPaused && gameActive.current) {
+        lastTime.current = 0;
+        animationFrameId.current = requestAnimationFrame(update);
+    }
     return () => cancelAnimationFrame(animationFrameId.current);
-  }, [update]);
+  }, [isPaused, update]);
 
   // Touch Controls
   const handleTouchStart = (side: 'left' | 'right') => {
@@ -677,20 +722,31 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
             {Math.ceil(timeLeft)}
         </div>
         
-        {/* Speedometer */}
-        <div className="bg-black/60 text-white p-2 md:p-3 rounded-xl backdrop-blur-md flex flex-col items-center border border-white/10 shadow-lg w-28 ring-1 ring-white/20">
-             <div className="flex items-center gap-1 text-[10px] text-gray-400 font-bold tracking-wider w-full justify-center mb-1">
-                 <Gauge size={12} /> SPEED
-             </div>
-             <div className="relative w-full h-1 bg-slate-700 rounded-full overflow-hidden mb-1">
-                 <div 
-                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-400 via-yellow-400 to-red-500 transition-all duration-300"
-                    style={{ width: `${gaugePercent}%` }}
-                 />
-             </div>
-             <div className="text-xl font-mono font-bold leading-none flex items-baseline gap-1">
-                 {displaySpeed} <span className="text-[10px] text-gray-500">KM/H</span>
-             </div>
+        {/* Right Controls Area: Speedometer + Pause */}
+        <div className="flex flex-col gap-2 pointer-events-auto">
+            {/* Speedometer */}
+            <div className="bg-black/60 text-white p-2 md:p-3 rounded-xl backdrop-blur-md flex flex-col items-center border border-white/10 shadow-lg w-28 ring-1 ring-white/20 pointer-events-none">
+                <div className="flex items-center gap-1 text-[10px] text-gray-400 font-bold tracking-wider w-full justify-center mb-1">
+                    <Gauge size={12} /> SPEED
+                </div>
+                <div className="relative w-full h-1 bg-slate-700 rounded-full overflow-hidden mb-1">
+                    <div 
+                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-green-400 via-yellow-400 to-red-500 transition-all duration-300"
+                        style={{ width: `${gaugePercent}%` }}
+                    />
+                </div>
+                <div className="text-xl font-mono font-bold leading-none flex items-baseline gap-1">
+                    {displaySpeed} <span className="text-[10px] text-gray-500">KM/H</span>
+                </div>
+            </div>
+
+            {/* Pause Button */}
+            <button 
+                onClick={togglePause}
+                className="bg-slate-800 hover:bg-slate-700 text-white p-3 rounded-xl border border-white/10 shadow-lg flex items-center justify-center active:scale-95 transition-all self-end"
+            >
+                <Pause size={24} />
+            </button>
         </div>
       </div>
       
@@ -788,6 +844,43 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
                <path d="M50 50 L20 10 M50 50 L80 10 M50 50 L10 40 M50 50 L90 60 M50 50 L30 90" stroke="white" strokeWidth="0.5" fill="none" />
            </svg>
         </div>
+      )}
+
+      {/* Pause Menu Overlay */}
+      {isPaused && (
+          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
+              <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in duration-200">
+                  <h2 className="text-3xl font-bold text-center mb-8 flex items-center justify-center gap-2">
+                      <Pause size={32} className="text-blue-500"/> PAUSED
+                  </h2>
+                  <div className="flex flex-col gap-4">
+                      <button 
+                          onClick={togglePause}
+                          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                      >
+                          <Play size={20} fill="currentColor"/> RESUME
+                      </button>
+                      <button 
+                          onClick={handleRestart}
+                          className="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                      >
+                          <RotateCcw size={20} /> RESTART LEVEL
+                      </button>
+                       <button 
+                          onClick={handleSkip}
+                          className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors"
+                      >
+                          <FastForward size={20} /> SKIP LEVEL
+                      </button>
+                      <button 
+                          onClick={handleQuit}
+                          className="w-full bg-red-900/50 hover:bg-red-900 text-red-200 font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors border border-red-900"
+                      >
+                          <LogOut size={20} /> RETURN TO SHOP
+                      </button>
+                  </div>
+              </div>
+          </div>
       )}
 
       <div className="absolute top-24 left-0 right-0 text-center pointer-events-none z-10">
