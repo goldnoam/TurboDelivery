@@ -6,56 +6,77 @@
     <title>Turbo Delivery Dash</title>
     <meta name="description" content="A high-octane delivery runner game. Start on a scooter and upgrade to a race car.">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚚%3C/text%3E%3C/svg%3E">
+    
     <script>
-      // Suppress Tailwind CDN warnings to simulate a production environment and keep console clean
-      (function() {
-        const originalWarn = console.warn;
-        const originalLog = console.log;
-        
-        const isTailwindMessage = (args) => {
-          return args.some(arg => 
-            typeof arg === 'string' && 
-            (arg.includes('cdn.tailwindcss.com') || arg.includes('should not be used in production'))
-          );
-        };
+      // Shim process.env for browser compatibility to prevent ReferenceErrors
+      window.process = window.process || { env: { API_KEY: '' } };
 
-        console.warn = function(...args) {
-          if (isTailwindMessage(args)) return;
-          originalWarn.apply(console, args);
-        };
-        
-        console.log = function(...args) {
-          if (isTailwindMessage(args)) return;
-          originalLog.apply(console, args);
-        };
-      })();
-    </script>
-    <!-- AdSense Script: May be blocked by ad-blockers (ERR_BLOCKED_BY_CLIENT) which is expected behavior -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-0274741291001288" crossorigin="anonymous"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            animation: {
-              'road-scroll': 'road-scroll 0.5s linear infinite',
-            },
-            backgroundImage: {
-              'dashed-line': "linear-gradient(to bottom, transparent 50%, rgba(255, 255, 255, 0.5) 50%)",
-            },
-            backgroundSize: {
-              'dashed-line': '20px 80px'
-            },
-            keyframes: {
-              'road-scroll': {
-                '0%': { backgroundPosition: '0 0' },
-                '100%': { backgroundPosition: '0 80px' },
+      // Initialize ads array immediately
+      window.adsbygoogle = window.adsbygoogle || [];
+
+      // Tailwind Config must be defined before tailwind script loads or immediately handled
+      window.tailwind = {
+        config: {
+          theme: {
+            extend: {
+              animation: {
+                'road-scroll': 'road-scroll 0.5s linear infinite',
+              },
+              backgroundImage: {
+                'dashed-line': "linear-gradient(to bottom, transparent 50%, rgba(255, 255, 255, 0.5) 50%)",
+              },
+              backgroundSize: {
+                'dashed-line': '20px 80px'
+              },
+              keyframes: {
+                'road-scroll': {
+                  '0%': { backgroundPosition: '0 0' },
+                  '100%': { backgroundPosition: '0 80px' },
+                }
               }
             }
           }
         }
-      }
+      };
+
+      // Suppress specific warnings to keep console clean
+      (function() {
+        const originalWarn = console.warn;
+        const originalLog = console.log;
+        const originalError = console.error;
+        
+        const isIgnorableMessage = (args) => {
+          const msg = args[0];
+          if (typeof msg !== 'string') return false;
+          return msg.includes('cdn.tailwindcss.com') || 
+                 msg.includes('should not be used in production') ||
+                 msg.includes('adsbygoogle') || 
+                 msg.includes('TagError'); 
+        };
+
+        console.warn = function(...args) {
+          if (isIgnorableMessage(args)) return;
+          originalWarn.apply(console, args);
+        };
+        
+        console.log = function(...args) {
+          if (isIgnorableMessage(args)) return;
+          originalLog.apply(console, args);
+        };
+
+        console.error = function(...args) {
+           if (isIgnorableMessage(args)) return;
+           originalError.apply(console, args);
+        }
+      })();
     </script>
+
+    <!-- AdSense Script -->
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-0274741291001288" crossorigin="anonymous" onerror="console.log('AdSense blocked or failed to load.')"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
       /* Custom scrollbar for webkit */
       ::-webkit-scrollbar {
@@ -78,17 +99,17 @@
         touch-action: none;
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
-  }
-}
-</script>
+    <script type="importmap">
+    {
+      "imports": {
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
+      }
+    }
+    </script>
 </head>
   <body class="bg-black text-white overflow-hidden">
     <div id="root"></div>

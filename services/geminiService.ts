@@ -4,7 +4,7 @@ import { LevelTheme } from "../types";
 // Initialize the API client
 // Note: In a real production app, you might proxy this through a backend to protect the key.
 // Here we assume a client-side environment where the key is injected via env.
-const apiKey = process.env.API_KEY || ''; 
+const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) ? process.env.API_KEY : '';
 const ai = new GoogleGenAI({ apiKey });
 
 export const generateLevelMission = async (levelNumber: number, vehicleName: string): Promise<LevelTheme> => {
