@@ -1,3 +1,4 @@
+
 import { VehicleStats, VehicleType } from './types';
 
 export const LEVEL_DURATION = 20; // seconds
@@ -85,20 +86,22 @@ export const VEHICLES: Record<VehicleType, VehicleStats> = {
   }
 };
 
+const initialUpgrades = { speed: 1, handling: 1, income: 1 };
+
 export const INITIAL_GAME_STATE = {
   money: 0,
   currentLevel: 1,
   ownedVehicles: [VehicleType.SCOOTER],
   equippedVehicle: VehicleType.SCOOTER,
   highScore: 0,
-  vehicleLevels: {
-    [VehicleType.SCOOTER]: 1,
-    [VehicleType.BICYCLE]: 1,
-    [VehicleType.HOVERBOARD]: 1,
-    [VehicleType.SEGWAY]: 1,
-    [VehicleType.ATV]: 1,
-    [VehicleType.MOTORCYCLE]: 1,
-    [VehicleType.TRACTOR]: 1,
-    [VehicleType.RACECAR]: 1
+  vehicleUpgrades: {
+    [VehicleType.SCOOTER]: { ...initialUpgrades },
+    [VehicleType.BICYCLE]: { ...initialUpgrades },
+    [VehicleType.HOVERBOARD]: { ...initialUpgrades },
+    [VehicleType.SEGWAY]: { ...initialUpgrades },
+    [VehicleType.ATV]: { ...initialUpgrades },
+    [VehicleType.MOTORCYCLE]: { ...initialUpgrades },
+    [VehicleType.TRACTOR]: { ...initialUpgrades },
+    [VehicleType.RACECAR]: { ...initialUpgrades }
   }
 };

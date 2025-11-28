@@ -2,13 +2,13 @@
 import React, { useState } from 'react';
 import { VehicleType, GameState } from '../types';
 import { VEHICLES } from '../constants';
-import { ShoppingCart, Check, Lock, Play, Zap, ArrowUpCircle, AlertTriangle, X } from 'lucide-react';
+import { ShoppingCart, Check, Lock, Play, Zap, ArrowUpCircle, AlertTriangle, X, Gauge, Move, DollarSign, Plus } from 'lucide-react';
 import { playPurchaseSound, playUpgradeSound } from '../audio';
 
 interface ShopProps {
   gameState: GameState;
   onPurchase: (vehicleId: VehicleType) => void;
-  onUpgrade: (vehicleId: VehicleType) => void;
+  onUpgrade: (vehicleId: VehicleType, stat: 'speed' | 'handling' | 'income') => void;
   onEquip: (vehicleId: VehicleType) => void;
   onNextLevel: () => void;
 }
@@ -17,8 +17,8 @@ export const Shop: React.FC<ShopProps> = ({ gameState, onPurchase, onUpgrade, on
   const [confirmPurchaseId, setConfirmPurchaseId] = useState<VehicleType | null>(null);
 
   const getUpgradeCost = (vehicleId: VehicleType, currentLevel: number) => {
-      const basePrice = VEHICLES[vehicleId].price || 100; // Handle free scooter base
-      return Math.floor(basePrice * 0.4 * currentLevel) + (100 * currentLevel);
+      const basePrice = Math.max(VEHICLES[vehicleId].price * 0.1, 50);
+      return Math.floor(basePrice * currentLevel * 1.5);
   };
 
   const handlePurchaseClick = (vehicleId: VehicleType) => {
@@ -35,6 +35,64 @@ export const Shop: React.FC<ShopProps> = ({ gameState, onPurchase, onUpgrade, on
 
   const cancelPurchase = () => {
     setConfirmPurchaseId(null);
+  };
+
+  const renderUpgradeRow = (
+      vehicleId: VehicleType, 
+      stat: 'speed' | 'handling' | 'income', 
+      label: string, 
+      icon: React.ReactNode, 
+      color: string
+    ) => {
+      const upgrades = gameState.vehicleUpgrades[vehicleId] || { speed: 1, handling: 1, income: 1 };
+      const currentLevel = upgrades[stat];
+      const cost = getUpgradeCost(vehicleId, currentLevel);
+      const canAfford = gameState.money >= cost;
+      const isMaxed = currentLevel >= 5;
+
+      return (
+          <div className="flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 w-20">
+                  <div className={`p-1 rounded ${color} bg-opacity-20`}>{icon}</div>
+                  <span className="font-bold text-slate-300">{label}</span>
+              </div>
+              
+              <div className="flex-1 flex gap-0.5 h-2 bg-slate-800 rounded-full overflow-hidden">
+                  {[1, 2, 3, 4, 5].map(lvl => (
+                      <div 
+                        key={lvl} 
+                        className={`flex-1 transition-all ${
+                            lvl <= currentLevel 
+                                ? color.replace('text-', 'bg-') 
+                                : 'bg-slate-700'
+                        }`}
+                      />
+                  ))}
+              </div>
+
+              {!isMaxed ? (
+                   <button
+                   onClick={() => {
+                       playUpgradeSound();
+                       onUpgrade(vehicleId, stat);
+                   }}
+                   disabled={!canAfford}
+                   className={`px-2 py-1 rounded flex items-center gap-1 min-w-[60px] justify-center transition-all ${
+                       canAfford 
+                       ? 'bg-slate-700 hover:bg-slate-600 text-white border border-slate-600' 
+                       : 'bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-800'
+                   }`}
+                   >
+                       {canAfford ? <Plus size={10} /> : <Lock size={10} />}
+                       ${cost}
+                   </button>
+              ) : (
+                  <div className="px-2 py-1 min-w-[60px] text-center font-bold text-slate-500 bg-slate-900 rounded border border-slate-800">
+                      MAX
+                  </div>
+              )}
+          </div>
+      );
   };
 
   return (
@@ -66,19 +124,12 @@ export const Shop: React.FC<ShopProps> = ({ gameState, onPurchase, onUpgrade, on
           const isEquipped = gameState.equippedVehicle === vehicle.id;
           const canAfford = gameState.money >= vehicle.price;
           
-          const currentLevel = gameState.vehicleLevels[vehicle.id] || 1;
-          const upgradeCost = getUpgradeCost(vehicle.id, currentLevel);
-          const canAffordUpgrade = gameState.money >= upgradeCost;
-
-          // Calculate current stats based on level
-          const speedPercent = Math.min(100, (vehicle.speed * (1 + (currentLevel - 1) * 0.1)) * 20); 
-          const handlingPercent = Math.min(100, (vehicle.handling * (1 + (currentLevel - 1) * 0.05)) * 25);
-          const incomeDisplay = (vehicle.incomeMultiplier * (1 + (currentLevel - 1) * 0.2)).toFixed(1);
-
+          const upgrades = gameState.vehicleUpgrades[vehicle.id] || { speed: 1, handling: 1, income: 1 };
+          
           return (
             <div
               key={vehicle.id}
-              className={`relative group rounded-2xl p-6 transition-all duration-300 border-2 flex flex-col ${
+              className={`relative group rounded-2xl p-4 transition-all duration-300 border-2 flex flex-col ${
                 isEquipped
                   ? 'bg-slate-800 border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.3)]'
                   : isOwned
@@ -87,7 +138,7 @@ export const Shop: React.FC<ShopProps> = ({ gameState, onPurchase, onUpgrade, on
               }`}
             >
               <div className="flex justify-between items-start mb-4">
-                <div className="text-6xl filter drop-shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <div className="text-5xl filter drop-shadow-lg group-hover:scale-110 transition-transform duration-300">
                   {vehicle.icon}
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -96,71 +147,48 @@ export const Shop: React.FC<ShopProps> = ({ gameState, onPurchase, onUpgrade, on
                         Equipped
                     </span>
                     )}
-                    {isOwned && (
-                        <span className="bg-blue-500/20 text-blue-400 text-xs px-2 py-1 rounded-full border border-blue-500/50 font-bold uppercase tracking-wider">
-                            Lvl {currentLevel}
-                        </span>
-                    )}
                 </div>
               </div>
 
               <h3 className="text-xl font-bold mb-1">{vehicle.name}</h3>
-              <p className="text-sm text-slate-400 mb-4 h-10 leading-snug">{vehicle.description}</p>
+              <p className="text-xs text-slate-400 mb-4 h-8 leading-snug line-clamp-2">{vehicle.description}</p>
 
-              <div className="space-y-3 mb-6 flex-grow">
-                <div>
-                    <div className="flex justify-between text-xs text-slate-400 mb-1">
-                        <span>Speed</span>
-                    </div>
-                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                        <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${speedPercent}%` }} />
-                    </div>
-                </div>
-                <div>
-                    <div className="flex justify-between text-xs text-slate-400 mb-1">
-                        <span>Handling</span>
-                    </div>
-                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                        <div className="bg-purple-500 h-full rounded-full transition-all duration-500" style={{ width: `${handlingPercent}%` }} />
-                    </div>
-                </div>
-                <div className="flex justify-between text-xs text-slate-400 items-center">
-                    <span>Income Multiplier</span>
-                    <span className="text-yellow-400 font-mono font-bold bg-yellow-400/10 px-2 py-0.5 rounded">x{incomeDisplay}</span>
-                </div>
-              </div>
+              {isOwned ? (
+                  <div className="flex flex-col gap-3 mb-4 bg-slate-950/50 p-3 rounded-xl border border-slate-800">
+                       {renderUpgradeRow(vehicle.id, 'speed', 'Speed', <Gauge size={12} />, 'text-blue-400')}
+                       {renderUpgradeRow(vehicle.id, 'handling', 'Handling', <Move size={12} />, 'text-purple-400')}
+                       {renderUpgradeRow(vehicle.id, 'income', 'Income', <DollarSign size={12} />, 'text-yellow-400')}
+                  </div>
+              ) : (
+                  <div className="flex-grow flex flex-col justify-end space-y-2 mb-4">
+                       <div className="flex justify-between text-xs text-slate-500">
+                           <span>Base Speed</span>
+                           <span className="text-blue-400">{vehicle.speed}x</span>
+                       </div>
+                       <div className="flex justify-between text-xs text-slate-500">
+                           <span>Base Handling</span>
+                           <span className="text-purple-400">{vehicle.handling}x</span>
+                       </div>
+                       <div className="flex justify-between text-xs text-slate-500">
+                           <span>Multiplier</span>
+                           <span className="text-yellow-400">{vehicle.incomeMultiplier}x</span>
+                       </div>
+                  </div>
+              )}
 
-              <div className="space-y-3 mt-auto">
+              <div className="mt-auto">
                 {isOwned ? (
-                    <>
-                        <button
-                        onClick={() => {
-                            playUpgradeSound();
-                            onUpgrade(vehicle.id);
-                        }}
-                        disabled={!canAffordUpgrade}
-                        className={`w-full py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all border ${
-                            canAffordUpgrade
-                            ? 'bg-slate-800 hover:bg-slate-700 border-yellow-500/50 text-yellow-400'
-                            : 'bg-slate-900 border-slate-800 text-slate-600 cursor-not-allowed'
-                        }`}
-                        >
-                            <ArrowUpCircle size={16} />
-                            Upgrade (${upgradeCost.toLocaleString()})
-                        </button>
-
-                        <button
-                        onClick={() => onEquip(vehicle.id)}
-                        disabled={isEquipped}
-                        className={`w-full py-3 rounded-xl font-bold transition-all ${
-                            isEquipped
-                            ? 'bg-slate-700 text-slate-500 cursor-default'
-                            : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/50'
-                        }`}
-                        >
-                        {isEquipped ? 'Ready' : 'Equip'}
-                        </button>
-                    </>
+                    <button
+                    onClick={() => onEquip(vehicle.id)}
+                    disabled={isEquipped}
+                    className={`w-full py-3 rounded-xl font-bold transition-all ${
+                        isEquipped
+                        ? 'bg-slate-700 text-slate-500 cursor-default'
+                        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/50'
+                    }`}
+                    >
+                    {isEquipped ? 'Ready' : 'Equip'}
+                    </button>
                 ) : (
                     <button
                     onClick={() => handlePurchaseClick(vehicle.id)}

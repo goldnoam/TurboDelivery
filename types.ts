@@ -46,13 +46,19 @@ export interface Entity {
   vx?: number; // Horizontal velocity for moving obstacles
 }
 
+export interface VehicleUpgradeSpecs {
+    speed: number;
+    handling: number;
+    income: number;
+}
+
 export interface GameState {
   money: number;
   currentLevel: number;
   ownedVehicles: VehicleType[];
   equippedVehicle: VehicleType;
   highScore: number;
-  vehicleLevels: Record<VehicleType, number>;
+  vehicleUpgrades: Record<VehicleType, VehicleUpgradeSpecs>;
 }
 
 export interface LevelTheme {

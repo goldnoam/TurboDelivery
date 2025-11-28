@@ -34,14 +34,18 @@ const App: React.FC = () => {
 
   const getEffectiveStats = (vehicleId: VehicleType): VehicleStats => {
       const base = VEHICLES[vehicleId];
-      const level = gameState.vehicleLevels[vehicleId] || 1;
-      const levelMult = level - 1;
+      // Default to level 1 if not found (backwards compatibility or init)
+      const upgrades = gameState.vehicleUpgrades[vehicleId] || { speed: 1, handling: 1, income: 1 };
+      
+      const speedMult = upgrades.speed - 1;
+      const handlingMult = upgrades.handling - 1;
+      const incomeMult = upgrades.income - 1;
       
       return {
           ...base,
-          speed: base.speed * (1 + levelMult * 0.1),
-          handling: base.handling * (1 + levelMult * 0.05),
-          incomeMultiplier: parseFloat((base.incomeMultiplier * (1 + levelMult * 0.2)).toFixed(2))
+          speed: base.speed * (1 + speedMult * 0.1),
+          handling: base.handling * (1 + handlingMult * 0.1),
+          incomeMultiplier: parseFloat((base.incomeMultiplier * (1 + incomeMult * 0.1)).toFixed(2))
       };
   };
 
@@ -78,23 +82,33 @@ const App: React.FC = () => {
         money: prev.money - vehicle.price,
         ownedVehicles: [...prev.ownedVehicles, id],
         equippedVehicle: id,
-        vehicleLevels: { ...prev.vehicleLevels, [id]: 1 } // Ensure initialized
+        vehicleUpgrades: {
+             ...prev.vehicleUpgrades,
+             [id]: { speed: 1, handling: 1, income: 1 }
+        }
       }));
     }
   };
 
-  const upgradeVehicle = (id: VehicleType) => {
-      const currentLevel = gameState.vehicleLevels[id] || 1;
-      const basePrice = VEHICLES[id].price || 100;
-      const cost = Math.floor(basePrice * 0.4 * currentLevel) + (100 * currentLevel);
+  const upgradeVehicle = (id: VehicleType, stat: 'speed' | 'handling' | 'income') => {
+      const upgrades = gameState.vehicleUpgrades[id] || { speed: 1, handling: 1, income: 1 };
+      const currentLevel = upgrades[stat];
+      
+      if (currentLevel >= 5) return;
+
+      const basePrice = Math.max(VEHICLES[id].price * 0.1, 50); // 10% of vehicle price or min $50
+      const cost = Math.floor(basePrice * currentLevel * 1.5); // Progressive cost
 
       if (gameState.money >= cost) {
           setGameState(prev => ({
               ...prev,
               money: prev.money - cost,
-              vehicleLevels: {
-                  ...prev.vehicleLevels,
-                  [id]: currentLevel + 1
+              vehicleUpgrades: {
+                  ...prev.vehicleUpgrades,
+                  [id]: {
+                      ...upgrades,
+                      [stat]: currentLevel + 1
+                  }
               }
           }));
       }
