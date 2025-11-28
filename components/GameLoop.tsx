@@ -80,6 +80,101 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
   const maxDisplaySpeed = 400; 
   const gaugePercent = Math.min(100, (displaySpeed / maxDisplaySpeed) * 100);
 
+  const getRandomColor = () => {
+    const colors = ['#f472b6', '#a78bfa', '#34d399', '#facc15', '#60a5fa', '#fb923c', '#2dd4bf', '#e879f9'];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  const spawnParticles = useCallback((x: number, y: number, count: number, type: ParticleType, options?: { color?: string, shape?: ParticleShape }) => {
+      for (let i = 0; i < count; i++) {
+        let vx = (Math.random() - 0.5) * 50;
+        let vy = (Math.random() - 0.5) * 50;
+        let size = Math.random() * 0.8 + 0.4;
+        let decay = 1.5;
+        let gravity = 0;
+        let color = options?.color || getRandomColor();
+        let shape: ParticleShape = options?.shape || 'circle';
+        let rotSpeed = (Math.random() - 0.5) * 720;
+
+        if (type === 'exhaust') {
+            vx = (Math.random() - 0.5) * 15;
+            vy = 25 + Math.random() * 15; // Moves down
+            size = Math.random() * 0.6 + 0.3;
+            decay = 2.0;
+            color = Math.random() > 0.5 ? '#94a3b8' : '#cbd5e1'; // Slate/Gray
+            shape = 'circle';
+            rotSpeed = (Math.random() - 0.5) * 100;
+        } else if (type === 'boost') {
+            vx = (Math.random() - 0.5) * 40; // Wider spread
+            vy = 40 + Math.random() * 20; // Moves down fast
+            size = Math.random() * 0.8 + 0.4;
+            decay = 2.5;
+            color = Math.random() > 0.5 ? '#3b82f6' : '#60a5fa'; // Blue flames
+            shape = Math.random() > 0.5 ? 'triangle' : 'circle';
+            rotSpeed = (Math.random() - 0.5) * 360;
+        } else if (type === 'collect') {
+            vx = (Math.random() - 0.5) * 90;
+            vy = (Math.random() - 0.5) * 90;
+            decay = 0.8 + Math.random() * 0.5;
+            gravity = 30; // Float down confetti style
+            shape = Math.random() > 0.6 ? 'square' : (Math.random() > 0.5 ? 'triangle' : 'circle');
+            size = Math.random() * 0.6 + 0.4;
+        } else if (type === 'coin') {
+             vx = (Math.random() - 0.5) * 70;
+             vy = (Math.random() - 0.5) * 70 - 30; // Pop up
+             color = Math.random() > 0.3 ? '#facc15' : '#fef08a'; // Yellows
+             shape = 'star';
+             decay = 1.0;
+             gravity = 20;
+             size = Math.random() * 0.8 + 0.4;
+        } else if (type === 'crash') {
+            vx = (Math.random() - 0.5) * 120;
+            vy = (Math.random() - 0.5) * 120;
+            
+            // Default crash colors if not overridden
+            if (!options?.color) {
+               color = Math.random() > 0.5 ? '#ef4444' : '#fee2e2'; // Reds
+               if (Math.random() > 0.8) color = '#1e293b'; // Some smoke
+            }
+            
+            shape = options?.shape || (Math.random() > 0.5 ? 'triangle' : 'square');
+            decay = 0.8;
+            gravity = 60; // Fall fast
+            size = Math.random() + 0.5;
+        } else if (type === 'shield_break') {
+            vx = (Math.random() - 0.5) * 100;
+            vy = (Math.random() - 0.5) * 100;
+            color = '#3b82f6';
+            shape = 'square';
+            decay = 1.2;
+            gravity = 10;
+        } else if (type === 'magic') {
+            vx = (Math.random() - 0.5) * 60;
+            vy = (Math.random() - 0.5) * 60 - 20;
+            color = '#d8b4fe';
+            shape = 'star';
+            decay = 1.0;
+        }
+
+        particles.current.push({
+            id: Math.random(),
+            x,
+            y,
+            vx,
+            vy,
+            life: 1.0,
+            decay,
+            size,
+            color,
+            rotation: Math.random() * 360,
+            rotSpeed,
+            shape,
+            gravity,
+            type
+        });
+      }
+  }, []);
+
   // Input Handling
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => { 
@@ -91,7 +186,13 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
         if (isPaused) return;
 
         keysPressed.current[e.key] = true; 
-        if (e.code === 'Space') isBoostingRef.current = true;
+        if (e.code === 'Space') {
+            if (!isBoostingRef.current) {
+                // Initial boost burst
+                spawnParticles(playerPos.current, 85, 15, 'boost');
+            }
+            isBoostingRef.current = true;
+        }
     };
     const handleKeyUp = (e: KeyboardEvent) => { 
         keysPressed.current[e.key] = false; 
@@ -105,7 +206,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isPaused]);
+  }, [isPaused, spawnParticles]);
 
   const togglePause = () => {
       setIsPaused(prev => !prev);
@@ -217,96 +318,6 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
     };
     entities.current.push(entity);
   }, []);
-
-  const getRandomColor = () => {
-    const colors = ['#f472b6', '#a78bfa', '#34d399', '#facc15', '#60a5fa', '#fb923c', '#2dd4bf', '#e879f9'];
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
-
-  const spawnParticles = (x: number, y: number, count: number, type: ParticleType) => {
-      for (let i = 0; i < count; i++) {
-        let vx = (Math.random() - 0.5) * 50;
-        let vy = (Math.random() - 0.5) * 50;
-        let size = Math.random() * 0.8 + 0.4;
-        let decay = 1.5;
-        let gravity = 0;
-        let color = getRandomColor();
-        let shape: ParticleShape = 'circle';
-        let rotSpeed = (Math.random() - 0.5) * 720;
-
-        if (type === 'exhaust') {
-            vx = (Math.random() - 0.5) * 15;
-            vy = 25 + Math.random() * 15; // Moves down
-            size = Math.random() * 0.6 + 0.3;
-            decay = 2.0;
-            color = Math.random() > 0.5 ? '#94a3b8' : '#cbd5e1'; // Slate/Gray
-            shape = 'circle';
-            rotSpeed = (Math.random() - 0.5) * 100;
-        } else if (type === 'boost') {
-            vx = (Math.random() - 0.5) * 20;
-            vy = 40 + Math.random() * 20; // Moves down fast
-            size = Math.random() * 0.8 + 0.4;
-            decay = 2.5;
-            color = Math.random() > 0.5 ? '#3b82f6' : '#60a5fa'; // Blue flames
-            shape = Math.random() > 0.5 ? 'triangle' : 'circle';
-            rotSpeed = (Math.random() - 0.5) * 360;
-        } else if (type === 'collect') {
-            vx = (Math.random() - 0.5) * 90;
-            vy = (Math.random() - 0.5) * 90;
-            decay = 0.8 + Math.random() * 0.5;
-            gravity = 30; // Float down confetti style
-            shape = Math.random() > 0.6 ? 'square' : (Math.random() > 0.5 ? 'triangle' : 'circle');
-            size = Math.random() * 0.6 + 0.4;
-        } else if (type === 'coin') {
-             vx = (Math.random() - 0.5) * 70;
-             vy = (Math.random() - 0.5) * 70 - 30; // Pop up
-             color = Math.random() > 0.3 ? '#facc15' : '#fef08a'; // Yellows
-             shape = 'star';
-             decay = 1.0;
-             gravity = 20;
-             size = Math.random() * 0.8 + 0.4;
-        } else if (type === 'crash') {
-            vx = (Math.random() - 0.5) * 120;
-            vy = (Math.random() - 0.5) * 120;
-            color = Math.random() > 0.5 ? '#ef4444' : '#fee2e2'; // Reds
-            if (Math.random() > 0.8) color = '#1e293b'; // Some smoke
-            shape = Math.random() > 0.5 ? 'triangle' : 'square';
-            decay = 0.8;
-            gravity = 60; // Fall fast
-            size = Math.random() + 0.5;
-        } else if (type === 'shield_break') {
-            vx = (Math.random() - 0.5) * 100;
-            vy = (Math.random() - 0.5) * 100;
-            color = '#3b82f6';
-            shape = 'square';
-            decay = 1.2;
-            gravity = 10;
-        } else if (type === 'magic') {
-            vx = (Math.random() - 0.5) * 60;
-            vy = (Math.random() - 0.5) * 60 - 20;
-            color = '#d8b4fe';
-            shape = 'star';
-            decay = 1.0;
-        }
-
-        particles.current.push({
-            id: Math.random(),
-            x,
-            y,
-            vx,
-            vy,
-            life: 1.0,
-            decay,
-            size,
-            color,
-            rotation: Math.random() * 360,
-            rotSpeed,
-            shape,
-            gravity,
-            type
-        });
-      }
-  };
 
   const showFeedback = (content: React.ReactNode, x: number, y: number, color: string = 'text-white') => {
       const id = Date.now();
@@ -442,7 +453,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
                     return newVal;
                 });
                 showFeedback(<span className="flex items-center gap-1">+{amount} <Package size={16}/></span>, ent.x, ent.y, 'text-green-400');
-                spawnParticles(ent.x, ent.y, 20, 'collect');
+                spawnParticles(ent.x, ent.y, 20, 'collect', { shape: 'square' });
                 return false; 
             } else if (ent.type === EntityType.COIN) {
                 playCollectSound();
@@ -453,7 +464,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
                     return newVal;
                 });
                 showFeedback(<span className="flex items-center gap-1">+{amount} 💰</span>, ent.x, ent.y, 'text-yellow-400');
-                spawnParticles(ent.x, ent.y, 15, 'coin');
+                spawnParticles(ent.x, ent.y, 15, 'coin', { shape: 'star' });
                 return false;
             } else if (ent.type === EntityType.POWERUP_SHIELD) {
                 playPowerupSound();
@@ -483,6 +494,27 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
                 else if (ent.type === EntityType.OBSTACLE_CAR) playCarHonk();
                 else playGenericCrash();
 
+                // Determine dynamic particle config based on obstacle type
+                let crashColor = '#ef4444'; 
+                let crashShape: ParticleShape = 'square';
+                
+                if (ent.type === EntityType.OBSTACLE_DOG) {
+                    crashColor = '#8B4513'; // SaddleBrown
+                    crashShape = 'circle';
+                } else if (ent.type === EntityType.OBSTACLE_CAT) {
+                    crashColor = '#FFA500'; // Orange
+                    crashShape = 'circle';
+                } else if (ent.type === EntityType.OBSTACLE_CONE) {
+                    crashColor = '#F97316'; // Orange-500
+                    crashShape = 'triangle';
+                } else if (ent.type === EntityType.OBSTACLE_BARRIER) {
+                    crashColor = '#EAB308'; // Yellow-500
+                    crashShape = 'square';
+                } else if (ent.type === EntityType.OBSTACLE_CAR) {
+                    crashColor = '#94A3B8'; // Slate-400
+                    crashShape = 'square';
+                }
+
                 // Damage Effects
                 setTimeLeft(t => Math.max(0, t - 2)); 
                 setShake(10);
@@ -490,7 +522,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
                 setTimeout(() => setScreenCrack(false), 300); // Quick flash
 
                 showFeedback(<span className="font-bold text-red-500 text-3xl">-2s</span>, ent.x, ent.y, 'text-red-500');
-                spawnParticles(ent.x, ent.y, 25, 'crash');
+                spawnParticles(ent.x, ent.y, 25, 'crash', { color: crashColor, shape: crashShape });
                 return false; 
             }
         }
@@ -511,7 +543,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
     if (gameActive.current) {
         animationFrameId.current = requestAnimationFrame(update);
     }
-  }, [vehicle, spawnEntity, speedMultiplier, onGameOver, shake, baseSpawnRate, isPaused]);
+  }, [vehicle, spawnEntity, speedMultiplier, onGameOver, shake, baseSpawnRate, isPaused, spawnParticles]);
 
   const [_, setTick] = useState(0);
 
@@ -532,7 +564,12 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
       keysPressed.current[side === 'left' ? 'ArrowLeft' : 'ArrowRight'] = false;
   };
   
-  const handleBoostStart = () => { isBoostingRef.current = true; };
+  const handleBoostStart = () => { 
+      if (!isBoostingRef.current) {
+          spawnParticles(playerPos.current, 85, 15, 'boost');
+      }
+      isBoostingRef.current = true; 
+  };
   const handleBoostEnd = () => { isBoostingRef.current = false; };
 
   const getEntityIcon = (type: EntityType) => {
