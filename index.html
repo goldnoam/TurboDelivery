@@ -80,8 +80,8 @@
       })();
 
       function handleAdSenseError(e) {
-        // Silently handle ad blocking
-        console.log("AdSense blocked or failed to load. Continuing app execution.");
+        // Silently handle ad blocking - no logging to avoid confusion
+        // The ad blocker prevented the script from loading, which is expected behavior for many users.
         return true;
       }
     </script>
