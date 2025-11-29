@@ -1,7 +1,7 @@
 
 import { VehicleStats, VehicleType } from './types';
 
-export const LEVEL_DURATION = 20; // seconds
+export const LEVEL_DURATION = 60; // seconds
 
 export const VEHICLES: Record<VehicleType, VehicleStats> = {
   [VehicleType.SCOOTER]: {
@@ -83,6 +83,26 @@ export const VEHICLES: Record<VehicleType, VehicleStats> = {
     incomeMultiplier: 10,
     icon: "🏎️",
     description: "When same-day delivery isn't fast enough."
+  },
+  [VehicleType.HELICOPTER]: {
+    id: VehicleType.HELICOPTER,
+    name: "Sky Chopper",
+    price: 8000,
+    speed: 2.5,
+    handling: 2.0,
+    incomeMultiplier: 15,
+    icon: "🚁",
+    description: "Traffic jams are for peasants. Fly above it all."
+  },
+  [VehicleType.SUBMARINE]: {
+    id: VehicleType.SUBMARINE,
+    name: "Yellow Sub",
+    price: 15000,
+    speed: 1.8,
+    handling: 0.8,
+    incomeMultiplier: 25,
+    icon: "🌊",
+    description: "Deep sea delivery. Surprisingly effective on asphalt."
   }
 };
 
@@ -102,6 +122,8 @@ export const INITIAL_GAME_STATE = {
     [VehicleType.ATV]: { ...initialUpgrades },
     [VehicleType.MOTORCYCLE]: { ...initialUpgrades },
     [VehicleType.TRACTOR]: { ...initialUpgrades },
-    [VehicleType.RACECAR]: { ...initialUpgrades }
+    [VehicleType.RACECAR]: { ...initialUpgrades },
+    [VehicleType.HELICOPTER]: { ...initialUpgrades },
+    [VehicleType.SUBMARINE]: { ...initialUpgrades }
   }
 };

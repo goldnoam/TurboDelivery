@@ -7,7 +7,9 @@ export enum VehicleType {
   ATV = 'ATV',
   MOTORCYCLE = 'MOTORCYCLE',
   TRACTOR = 'TRACTOR',
-  RACECAR = 'RACECAR'
+  RACECAR = 'RACECAR',
+  HELICOPTER = 'HELICOPTER',
+  SUBMARINE = 'SUBMARINE'
 }
 
 export interface VehicleStats {
