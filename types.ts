@@ -71,3 +71,16 @@ export interface LevelTheme {
   environmentColor: string;
   primaryObstacle: string;
 }
+
+export enum WeatherType {
+  CLEAR = 'CLEAR',
+  RAIN = 'RAIN',
+  FOG = 'FOG'
+}
+
+export interface GhostFrame {
+  t: number; // Time elapsed
+  x: number; // X Position
+}
+
+export type GhostRun = GhostFrame[];

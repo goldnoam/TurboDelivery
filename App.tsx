@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { GameState, VehicleType, LevelTheme, VehicleStats } from './types';
+import { GameState, VehicleType, LevelTheme, VehicleStats, GhostRun } from './types';
 import { INITIAL_GAME_STATE, VEHICLES } from './constants';
 import { Shop } from './components/Shop';
 import { GameLoop } from './components/GameLoop';
@@ -23,6 +23,7 @@ const App: React.FC = () => {
   const [levelTheme, setLevelTheme] = useState<LevelTheme | null>(null);
   const [lastEarnings, setLastEarnings] = useState(0);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [currentGhostRun, setCurrentGhostRun] = useState<GhostRun | null>(null);
 
   // Load High Score
   useEffect(() => {
@@ -49,20 +50,56 @@ const App: React.FC = () => {
       };
   };
 
+  const loadGhostRun = (level: number): GhostRun | null => {
+      try {
+          const saved = localStorage.getItem(`tdd_ghost_level_${level}`);
+          return saved ? JSON.parse(saved) : null;
+      } catch (e) {
+          console.error("Failed to load ghost run", e);
+          return null;
+      }
+  };
+
+  const saveGhostRun = (level: number, run: GhostRun) => {
+      try {
+          localStorage.setItem(`tdd_ghost_level_${level}`, JSON.stringify(run));
+      } catch (e) {
+          console.error("Failed to save ghost run", e);
+      }
+  };
+
   const startGame = async () => {
     initAudio(); // Initialize audio context on user interaction
     setAppState(AppState.LOADING_LEVEL);
+    
+    // Load ghost run for this level
+    const ghost = loadGhostRun(gameState.currentLevel);
+    setCurrentGhostRun(ghost);
+
     const vehicleName = VEHICLES[gameState.equippedVehicle].name;
     const theme = await generateLevelMission(gameState.currentLevel, vehicleName);
     setLevelTheme(theme);
     setAppState(AppState.PLAYING);
   };
 
-  const handleGameOver = (earnings: number, survived: boolean) => {
+  const handleGameOver = (earnings: number, survived: boolean, recording: GhostRun) => {
     setLastEarnings(earnings);
     setGameState(prev => {
       const newMoney = prev.money + earnings;
       const newHighScore = Math.max(prev.highScore, newMoney); 
+      
+      // Save ghost run if this is a high score run or we completed the level with a good run
+      // Simple logic: if earnings > 0 and survived, consider saving if it's better than previous?
+      // For now, we overwrite if we survived and got a good score.
+      // Ideally we check if this score is higher than the best score for this level, but we don't track level-specific scores yet.
+      // Let's just save if it was a successful run (survived) and we earned money.
+      if (survived && earnings > 0) {
+           // We might want to only save if it's the "best", but simpler is to just save latest successful run
+           // or save if earnings > previous best.
+           // Since we don't have previous level score, let's just save successful runs.
+           saveGhostRun(prev.currentLevel, recording);
+      }
+
       localStorage.setItem('tdd_highscore', newHighScore.toString());
       
       return {
@@ -236,6 +273,7 @@ const App: React.FC = () => {
             theme={levelTheme}
             level={gameState.currentLevel}
             onGameOver={handleGameOver}
+            ghostRun={currentGhostRun}
         />
       </div>
     );

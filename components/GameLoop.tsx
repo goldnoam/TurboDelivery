@@ -1,8 +1,8 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { VehicleStats, Entity, EntityType, LevelTheme } from '../types';
+import { VehicleStats, Entity, EntityType, LevelTheme, GhostRun, WeatherType } from '../types';
 import { LEVEL_DURATION } from '../constants';
-import { Trophy, Package, ChevronLeft, ChevronRight, Gauge, Zap, Map as MapIcon, Shield, Magnet, Pause, RotateCcw, LogOut, Play, FastForward } from 'lucide-react';
+import { Trophy, Package, ChevronLeft, ChevronRight, Gauge, Zap, Map as MapIcon, Shield, Magnet, Pause, RotateCcw, LogOut, Play, FastForward, Wrench, CloudRain, CloudFog, Ghost } from 'lucide-react';
 import { 
   playCollectSound, 
   playGenericCrash, 
@@ -21,11 +21,12 @@ interface GameLoopProps {
   vehicle: VehicleStats;
   theme: LevelTheme;
   level: number;
-  onGameOver: (earnedMoney: number, survived: boolean) => void;
+  onGameOver: (earnedMoney: number, survived: boolean, recording: GhostRun) => void;
+  ghostRun?: GhostRun | null;
 }
 
 type ParticleShape = 'circle' | 'square' | 'triangle' | 'star';
-type ParticleType = 'exhaust' | 'collect' | 'coin' | 'crash' | 'boost' | 'shield_break' | 'magic';
+type ParticleType = 'exhaust' | 'collect' | 'coin' | 'crash' | 'boost' | 'shield_break' | 'magic' | 'fire' | 'smoke_damage';
 
 interface Particle {
   id: number;
@@ -44,7 +45,7 @@ interface Particle {
   type: ParticleType;
 }
 
-export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGameOver }) => {
+export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGameOver, ghostRun }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const [timeLeft, setTimeLeft] = useState(LEVEL_DURATION);
@@ -56,6 +57,9 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
   const [isPaused, setIsPaused] = useState(false);
   const [spinOut, setSpinOut] = useState(0); // Degrees of rotation from slipping
   const [isBoosting, setIsBoosting] = useState(false); // State for UI updates
+  const [damage, setDamage] = useState(0); // 0-100 visual damage
+  const [weather, setWeather] = useState<WeatherType>(WeatherType.CLEAR);
+  const [ghostPos, setGhostPos] = useState<number | null>(null);
   
   // Power-up States
   const shieldActive = useRef(false);
@@ -74,6 +78,10 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
   const gameActive = useRef(true);
   const animationFrameId = useRef<number>(0);
   
+  // Ghost Recording
+  const currentRun = useRef<GhostRun>([]);
+  const lastRecordTime = useRef(0);
+  
   const earnedMoneyRef = useRef(0);
 
   // Difficulty & Visuals
@@ -83,6 +91,14 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
   const displaySpeed = Math.round(vehicle.speed * 50 * speedMultiplier * (isBoosting ? 2 : 1)); 
   const maxDisplaySpeed = 400; 
   const gaugePercent = Math.min(100, (displaySpeed / maxDisplaySpeed) * 100);
+
+  // Initialize Weather
+  useEffect(() => {
+    const roll = Math.random();
+    if (roll < 0.2) setWeather(WeatherType.RAIN);
+    else if (roll < 0.4) setWeather(WeatherType.FOG);
+    else setWeather(WeatherType.CLEAR);
+  }, []);
 
   const getRandomColor = () => {
     const colors = ['#f472b6', '#a78bfa', '#34d399', '#facc15', '#60a5fa', '#fb923c', '#2dd4bf', '#e879f9'];
@@ -158,6 +174,20 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
             color = '#d8b4fe';
             shape = 'star';
             decay = 1.0;
+        } else if (type === 'fire') {
+            vx = (Math.random() - 0.5) * 30;
+            vy = 30 + Math.random() * 20; // Moves down
+            color = Math.random() > 0.5 ? '#ef4444' : '#f59e0b'; // Red/Orange
+            shape = 'triangle';
+            decay = 2.5;
+            size = Math.random() * 0.8 + 0.4;
+        } else if (type === 'smoke_damage') {
+             vx = (Math.random() - 0.5) * 20;
+             vy = 20 + Math.random() * 15;
+             color = '#57534e'; // Stone gray
+             shape = 'circle';
+             decay = 1.5;
+             size = Math.random() * 0.7 + 0.4;
         }
 
         particles.current.push({
@@ -229,6 +259,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
       setScreenCrack(false);
       setShake(0);
       setSpinOut(0);
+      setDamage(0);
       setFeedback([]);
       setIsBoosting(false);
       
@@ -244,14 +275,15 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
       keysPressed.current = {};
       isBoostingRef.current = false;
       gameActive.current = true;
+      currentRun.current = [];
   };
 
   const handleQuit = () => {
-      onGameOver(earnedMoneyRef.current, false);
+      onGameOver(earnedMoneyRef.current, false, []);
   };
 
   const handleSkip = () => {
-      onGameOver(earnedMoneyRef.current, true);
+      onGameOver(earnedMoneyRef.current, true, []);
   };
 
   const spawnEntity = useCallback(() => {
@@ -353,12 +385,27 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
     
     if (lastTime.current === 0) {
       lastTime.current = time;
+      lastRecordTime.current = time;
       animationFrameId.current = requestAnimationFrame(update);
       return;
     }
 
     const deltaTime = Math.min((time - lastTime.current) / 1000, 0.1);
     lastTime.current = time;
+
+    // Ghost Recording (Every 100ms)
+    if (time - lastRecordTime.current > 100) {
+        const elapsedTime = LEVEL_DURATION - timeLeft;
+        currentRun.current.push({ t: elapsedTime, x: playerPos.current });
+        lastRecordTime.current = time;
+        
+        // Ghost Playback Position
+        if (ghostRun) {
+            const ghostFrame = ghostRun.find(f => f.t >= elapsedTime);
+            if (ghostFrame) setGhostPos(ghostFrame.x);
+            else setGhostPos(null); // Ghost finished or not started
+        }
+    }
 
     // Spin Decay
     if (spinOut > 0) {
@@ -392,6 +439,16 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
         }
     }
 
+    // Damage Effects
+    if (damage > 50) {
+         // Smoke
+         if (Math.random() < 0.1) spawnParticles(playerPos.current, 85, 1, 'smoke_damage');
+    }
+    if (damage > 75) {
+         // Fire
+         if (Math.random() < 0.15) spawnParticles(playerPos.current, 85, 1, 'fire');
+    }
+
     // Spawn Logic
     if (time - lastSpawn.current > (baseSpawnRate / (isBoostingRef.current ? 2 : 1))) {
       spawnEntity();
@@ -401,8 +458,11 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
     // Movement Logic
     const speed = vehicle.speed * 50 * speedMultiplier * (isBoostingRef.current ? 2 : 1);
     
-    if (keysPressed.current['ArrowLeft']) playerPos.current = Math.max(5, playerPos.current - vehicle.handling * 60 * deltaTime);
-    if (keysPressed.current['ArrowRight']) playerPos.current = Math.min(95, playerPos.current + vehicle.handling * 60 * deltaTime);
+    // Handling modifier based on weather
+    const handlingMod = weather === WeatherType.RAIN ? 0.8 : 1.0;
+    
+    if (keysPressed.current['ArrowLeft']) playerPos.current = Math.max(5, playerPos.current - vehicle.handling * handlingMod * 60 * deltaTime);
+    if (keysPressed.current['ArrowRight']) playerPos.current = Math.min(95, playerPos.current + vehicle.handling * handlingMod * 60 * deltaTime);
 
     // Update Entities
     entities.current.forEach(entity => {
@@ -478,6 +538,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
 
           // Damage
           setTimeLeft(prev => Math.max(0, prev - 2));
+          setDamage(prev => Math.min(100, prev + 10)); // Increase damage
           setShake(10);
           setScreenCrack(true);
           
@@ -517,7 +578,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
         const newVal = prev - deltaTime;
         if (newVal <= 0) {
             gameActive.current = false;
-            onGameOver(earnedMoneyRef.current, true);
+            onGameOver(earnedMoneyRef.current, true, currentRun.current);
             return 0;
         }
         return newVal;
@@ -540,7 +601,7 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
     }
 
     animationFrameId.current = requestAnimationFrame(update);
-  }, [vehicle, level, onGameOver, spawnParticles, spawnEntity]);
+  }, [vehicle, level, onGameOver, spawnParticles, spawnEntity, damage, weather, ghostRun, timeLeft]);
 
   useEffect(() => {
     animationFrameId.current = requestAnimationFrame(update);
@@ -590,6 +651,14 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
       <div className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${isBoosting ? 'opacity-100' : 'opacity-0'}`}
            style={{ background: 'radial-gradient(circle at center, transparent 40%, rgba(6, 182, 212, 0.4) 100%)', boxShadow: 'inset 0 0 100px rgba(6, 182, 212, 0.5)' }}>
       </div>
+
+      {/* Weather Overlays */}
+      {weather === WeatherType.RAIN && (
+          <div className="absolute inset-0 pointer-events-none z-20 opacity-50 bg-[url('https://www.transparenttextures.com/patterns/diagonal-stripes.png')] animate-road-scroll"></div>
+      )}
+      {weather === WeatherType.FOG && (
+          <div className="absolute inset-0 pointer-events-none z-20 bg-gradient-to-b from-gray-400/50 to-transparent h-1/2"></div>
+      )}
 
       {/* Screen Crack Overlay */}
       {screenCrack && (
@@ -663,6 +732,26 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
         </div>
       ))}
 
+      {/* Ghost Player */}
+      {ghostPos !== null && (
+          <div 
+            className="absolute transition-all duration-300 text-5xl opacity-40 grayscale pointer-events-none"
+            style={{
+                left: `${ghostPos}%`,
+                top: '80%',
+                transform: 'translateX(-50%)',
+                filter: 'drop-shadow(0 0 10px white)'
+            }}
+          >
+              <div className="relative">
+                  {vehicle.icon}
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white bg-black/50 px-1 rounded flex items-center gap-1">
+                      <Ghost size={8} /> BEST
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Player */}
       <div
         ref={playerRef}
@@ -670,8 +759,12 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
         style={{
           left: `${playerPos.current}%`,
           top: '80%',
-          transform: `translateX(-50%) rotate(${ (keysPressed.current['ArrowLeft'] ? -15 : keysPressed.current['ArrowRight'] ? 15 : 0) + spinOut}deg)`,
-          filter: isBoosting ? 'drop-shadow(0 0 15px #06b6d4) brightness(1.2)' : 'drop-shadow(0 4px 6px rgba(0,0,0,0.5))'
+          transform: `translateX(-50%) rotate(${ (keysPressed.current['ArrowLeft'] ? -15 : keysPressed.current['ArrowRight'] ? 15 : 0) + spinOut}deg) ${damage > 70 ? `translate(${Math.random()*2}px, ${Math.random()*2}px)` : ''}`,
+          filter: isBoosting 
+            ? 'drop-shadow(0 0 15px #06b6d4) brightness(1.2)' 
+            : damage > 0 
+                ? `sepia(${damage}%) saturate(${100 + damage}%) hue-rotate(-${damage * 0.5}deg) drop-shadow(0 4px 6px rgba(0,0,0,0.5))`
+                : 'drop-shadow(0 4px 6px rgba(0,0,0,0.5))'
         }}
       >
         {vehicle.icon}
@@ -694,6 +787,24 @@ export const GameLoop: React.FC<GameLoopProps> = ({ vehicle, theme, level, onGam
              {timeLeft.toFixed(1)}s
            </div>
            <div className="text-sm text-slate-300 font-bold uppercase tracking-wider">{theme.title}</div>
+           
+           {/* Weather Icon */}
+           {weather !== WeatherType.CLEAR && (
+               <div className="mt-1 flex items-center gap-1 text-xs font-bold text-slate-300">
+                   {weather === WeatherType.RAIN ? <CloudRain size={12} className="text-blue-400"/> : <CloudFog size={12} className="text-gray-400"/>}
+                   {weather}
+               </div>
+           )}
+
+           {/* Damage Indicator */}
+           {damage > 0 && (
+               <div className="mt-2 flex items-center gap-1 text-xs font-bold text-red-400 animate-pulse">
+                   <Wrench size={12} /> {damage}% DMG
+                   <div className="w-16 h-1 bg-red-900 rounded-full overflow-hidden ml-1">
+                       <div className="h-full bg-red-500 transition-all duration-300" style={{ width: `${damage}%` }}></div>
+                   </div>
+               </div>
+           )}
         </div>
         
         <div className="flex flex-col items-end gap-2">
