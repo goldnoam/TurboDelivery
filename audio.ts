@@ -1,5 +1,6 @@
 
 
+
 // Simple retro sound synthesizer using Web Audio API
 
 let audioCtx: AudioContext | null = null;
@@ -152,6 +153,56 @@ export const playCarHonk = () => {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + 0.4);
+};
+
+export const playSlipSound = () => {
+    const ctx = getCtx();
+    if (!ctx) return;
+    
+    // Noise buffer for tire screech
+    const bufferSize = ctx.sampleRate * 0.5; // 0.5 seconds
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+    
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1000, ctx.currentTime);
+    filter.Q.value = 1;
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    
+    noise.start();
+};
+
+export const playBirdSound = () => {
+    const ctx = getCtx();
+    if (!ctx) return;
+    
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(2000, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(1000, ctx.currentTime + 0.1);
+    
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.1);
 };
 
 export const playGenericCrash = () => {
